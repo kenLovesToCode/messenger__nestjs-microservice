@@ -1,8 +1,20 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { UserEntity } from './entities/user.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class AuthService {
-  getHello(): string {
-    return 'Hello World!';
+  constructor(
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
+  ) {}
+
+  async getUsers(): Promise<UserEntity[]> {
+    return this.userRepository.find();
+  }
+
+  async createUser(firstName: string = 'Jovannes') {
+    return this.userRepository.save({ firstName });
   }
 }
