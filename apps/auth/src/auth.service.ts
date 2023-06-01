@@ -14,7 +14,7 @@ export class AuthService {
     return this.userRepository.find();
   }
 
-  async createUser(firstName: string = 'Jovannes') {
+  async createUser(firstName: string = 'kenloves') {
     return this.userRepository.save({ firstName });
   }
 }
