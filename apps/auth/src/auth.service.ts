@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -9,29 +10,29 @@ import * as bcrypt from 'bcrypt';
 
 import { UserEntity } from './entities/user.entity';
 import { NewUserDTO } from './dto/new-user.dto';
-import { ExistinUserDTO } from './dto/existing-user.dto';
+import { ExistingUserDTO } from './dto/existing-user.dto';
 import { JwtService } from '@nestjs/jwt';
+import { AuthServiceInterface } from './interface/auth.service.interface';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements AuthServiceInterface {
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly userRepository: Repository<UserEntity>,
+    @Inject('UsersRepositoryInterface') private readonly usersRepository,
     private readonly jwtService: JwtService,
   ) {}
 
   async getUsers(): Promise<UserEntity[]> {
-    return this.userRepository.find();
+    return this.usersRepository.findAll();
   }
 
   async findByEmail(email: string): Promise<UserEntity> {
-    return this.userRepository.findOne({
+    return this.usersRepository.findByCondition({
       where: { email },
       select: ['id', 'firstName', 'lastName', 'email', 'password'],
     });
   }
 
-  async doesPasswordMatched(
+  async doesPasswordMatch(
     password: string,
     hashedPassword: string,
   ): Promise<boolean> {
@@ -45,7 +46,7 @@ export class AuthService {
 
     if (!doesUserExist) return null;
 
-    const doesPasswordMatched = await this.doesPasswordMatched(
+    const doesPasswordMatched = await this.doesPasswordMatch(
       password,
       user.password,
     );
@@ -70,7 +71,7 @@ export class AuthService {
 
     const hashedPassword = await this.hashPassword(password);
 
-    const savedUser = await this.userRepository.save({
+    const savedUser = await this.usersRepository.save({
       firstName,
       lastName,
       email,
@@ -82,7 +83,7 @@ export class AuthService {
   }
 
   async login(
-    existingUser: Readonly<ExistinUserDTO>,
+    existingUser: Readonly<ExistingUserDTO>,
   ): Promise<{ token: string }> {
     const { email, password } = existingUser;
 
@@ -97,7 +98,7 @@ export class AuthService {
     return { token: jwt };
   }
 
-  async verifyJwt(jwt: string): Promise<{ exp: number }> {
+  async verifyJwt(jwt: string): Promise<{ exp: string }> {
     if (!jwt) {
       throw new UnauthorizedException();
     }

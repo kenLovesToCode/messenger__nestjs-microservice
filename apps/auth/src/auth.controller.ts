@@ -1,4 +1,4 @@
-import { Controller, UseGuards } from '@nestjs/common';
+import { Controller, Inject, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
   MessagePattern,
@@ -8,13 +8,14 @@ import {
 } from '@nestjs/microservices';
 import { SharedService } from '@app/shared';
 import { NewUserDTO } from './dto/new-user.dto';
-import { ExistinUserDTO } from './dto/existing-user.dto';
+import { ExistingUserDTO } from './dto/existing-user.dto';
 import { JwtGuard } from './jwt.guard';
 
 @Controller()
 export class AuthController {
   constructor(
-    private readonly authService: AuthService,
+    @Inject('AuthServiceInterface') private readonly authService: AuthService,
+    @Inject('SharedServiceInterface')
     private readonly sharedService: SharedService,
   ) {}
 
@@ -33,7 +34,7 @@ export class AuthController {
   @MessagePattern({ cmd: 'login' })
   async login(
     @Ctx() context: RmqContext,
-    @Payload() existingUser: ExistinUserDTO,
+    @Payload() existingUser: ExistingUserDTO,
   ) {
     console.log('get inside auth controller: ', existingUser);
     this.sharedService.acknowledgeMessage(context);
