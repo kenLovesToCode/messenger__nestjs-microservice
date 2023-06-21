@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -13,11 +14,17 @@ import { NewUserDTO } from './dto/new-user.dto';
 import { ExistingUserDTO } from './dto/existing-user.dto';
 import { JwtService } from '@nestjs/jwt';
 import { AuthServiceInterface } from './interface/auth.service.interface';
+import { FriendRequestsRepository, UserRepositoryInterface } from '@app/shared';
+import { UserJwt } from '@app/shared/interfaces/user-jwt.interface';
+import { FriendRequestEntity } from './entities/friend-request.entity';
 
 @Injectable()
 export class AuthService implements AuthServiceInterface {
   constructor(
-    @Inject('UsersRepositoryInterface') private readonly usersRepository,
+    @Inject('UsersRepositoryInterface')
+    private readonly usersRepository: UserRepositoryInterface,
+    @Inject('FriendRequestsRepositoryInterface')
+    private readonly friendRequestsRepository: FriendRequestsRepository,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -56,6 +63,10 @@ export class AuthService implements AuthServiceInterface {
     return user;
   }
 
+  async findById(id: number): Promise<UserEntity> {
+    return this.usersRepository.findOneById(id);
+  }
+
   async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 12);
   }
@@ -82,9 +93,7 @@ export class AuthService implements AuthServiceInterface {
     return savedUser;
   }
 
-  async login(
-    existingUser: Readonly<ExistingUserDTO>,
-  ): Promise<{ token: string }> {
+  async login(existingUser: Readonly<ExistingUserDTO>) {
     const { email, password } = existingUser;
 
     const user = await this.validateUser(password, email);
@@ -95,19 +104,49 @@ export class AuthService implements AuthServiceInterface {
 
     const jwt = await this.jwtService.signAsync({ user });
 
-    return { token: jwt };
+    return { token: jwt, user };
   }
 
-  async verifyJwt(jwt: string): Promise<{ exp: string }> {
+  async verifyJwt(jwt: string): Promise<{ user: UserEntity; exp: string }> {
     if (!jwt) {
       throw new UnauthorizedException();
     }
 
     try {
-      const { exp } = await this.jwtService.verifyAsync(jwt);
-      return { exp };
+      const { user, exp } = await this.jwtService.verifyAsync(jwt);
+      return { user, exp };
     } catch (error) {
       throw new UnauthorizedException();
     }
+  }
+
+  async getUserFromHeader(jwt: string): Promise<UserJwt> {
+    if (!jwt) return;
+
+    try {
+      return this.jwtService.decode(jwt) as UserJwt;
+    } catch (error) {
+      throw new BadRequestException();
+    }
+  }
+
+  async addFriend(
+    userId: number,
+    friendId: number,
+  ): Promise<FriendRequestEntity> {
+    const creator = await this.findById(userId);
+
+    const receiver = await this.findById(friendId);
+
+    return await this.friendRequestsRepository.save({ creator, receiver });
+  }
+
+  async getFriends(userId: number): Promise<FriendRequestEntity[]> {
+    const creator = await this.findById(userId);
+
+    return await this.friendRequestsRepository.findWithRelations({
+      where: [{ creator }, { receiver: creator }],
+      relations: ['creator', 'receiver'],
+    });
   }
 }
