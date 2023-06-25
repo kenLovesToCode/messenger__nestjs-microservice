@@ -20,3 +20,4 @@ export * from './repositories/friend-requests.repository';
 export * from './interceptors/user.interceptor';
 
 export * from './entities/friend-request.entity';
+export * from './entities/user.entity';
