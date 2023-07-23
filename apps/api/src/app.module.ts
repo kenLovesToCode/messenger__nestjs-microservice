@@ -6,7 +6,7 @@ import { SharedModule } from '@app/shared';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    // ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     SharedModule.registerRmq('AUTH_SERVICE', process.env.RABBITMQ_AUTH_QUEUE),
     SharedModule.registerRmq(
       'PRESENCE_SERVICE',
@@ -14,6 +14,5 @@ import { SharedModule } from '@app/shared';
     ),
   ],
   controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

@@ -1,14 +1,16 @@
 import {
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
 import { ClientProxy } from '@nestjs/microservices';
-import { Inject } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Server, Socket } from 'socket.io';
+import { Socket } from 'socket.io';
 import { firstValueFrom } from 'rxjs';
 import { Cache } from 'cache-manager';
 
@@ -17,19 +19,24 @@ import { IActiveUser } from './interfaces/active-user.interface';
 
 @WebSocketGateway({ cors: true })
 export class PresenceGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
 {
   constructor(
     @Inject('AUTH_SERVICE') private readonly authService: ClientProxy,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {}
 
-  @WebSocketServer()
-  server: Server;
+  private logger: Logger = new Logger('MessageGateway');
+
+  @WebSocketServer() server: any;
 
   //remove in production
   async onModuleInit() {
     await this.cache.reset();
+  }
+
+  afterInit(server: any) {
+    this.logger.log('WEBSOCKET INITIALIZED');
   }
 
   private async getFriends(userId: number) {
@@ -88,6 +95,7 @@ export class PresenceGateway
   }
 
   private async setActiveStatus(socket: Socket, isActive: boolean) {
+    this.logger.log('SETTING ACTIVE ', socket.data);
     const user = socket.data?.user;
 
     if (!user) return;
@@ -103,13 +111,14 @@ export class PresenceGateway
   }
 
   async handleDisconnect(socket: Socket) {
+    this.logger.log(`CLIENT DISCONNECTED: ${socket.id}`);
     console.log('HANDLE DISCONNECT');
 
     await this.setActiveStatus(socket, false);
   }
 
   async handleConnection(socket: Socket) {
-    console.log('HANDLE CONNECTION');
+    this.logger.log(`CLIENT CONNECTED: ${socket.id}`);
 
     const jwt = socket.handshake.headers.authorization ?? null;
 
@@ -129,14 +138,38 @@ export class PresenceGateway
     const { user } = res;
 
     socket.data.user = user;
+    console.log('setting active status ', socket);
 
     await this.setActiveStatus(socket, true);
   }
 
+  //auto sign out
   @SubscribeMessage('updateActiveStatus')
   async updateActiveStatus(socket: Socket, isActive: boolean) {
+    console.log('isActive: ', isActive);
+    console.log('SOCKET: ', socket.data);
     if (!socket.data?.user) return;
 
     await this.setActiveStatus(socket, isActive);
+  }
+
+  @SubscribeMessage('testingLang')
+  async testing(@MessageBody() test: string) {
+    console.log('TESTING LANG');
+    this.logger.log('TEST ONLY HAHAHA ', test);
+    // console.log('SOCKET: ', socket.data);
+    // if (!socket.data?.user) return;
+
+    // await this.setActiveStatus(socket, isActive);
+  }
+
+  @SubscribeMessage('testKen')
+  async kentest(@MessageBody() ken: string) {
+    console.log('TESTING LANG KEN');
+    this.logger.log('TEST ONLY KEN ', ken);
+    // console.log('SOCKET: ', socket.data);
+    // if (!socket.data?.user) return;
+
+    // await this.setActiveStatus(socket, isActive);
   }
 }
